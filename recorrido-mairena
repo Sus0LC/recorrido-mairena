@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Recorrido con Paradas – Mairena del Alcor</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+body { margin:0; font-family: Arial, sans-serif; }
+#map { height:100vh; width:100%; }
+
+.panel {
+    position:absolute;
+    top:10px; left:10px;
+    background:white;
+    padding:10px 14px;
+    border-radius:8px;
+    box-shadow:0 4px 12px rgba(0,0,0,.3);
+    z-index:1000;
+}
+
+button {
+    padding:6px 10px;
+    margin-top:6px;
+    border:none;
+    border-radius:4px;
+    background:#333;
+    color:white;
+    cursor:pointer;
+}
+
+.numero {
+    background:#1e90ff;
+    color:white;
+    border-radius:50%;
+    width:28px;
+    height:28px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:bold;
+    border:2px solid white;
+}
+</style>
+</head>
+
+<body>
+
+<div class="panel">
+    <strong>Recorrido completo</strong><br>
+    Total: <span id="total"></span><br>
+    <button onclick="exportarPDF()">Exportar PDF</button>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<script>
+const paradas = [
+"Pabellón Miguel Ángel Gómez Campuzano",
+"Vereda de San Agustín, 32",
+"San Agustín, 24",
+"Avenida de Andalucía, 26",
+"Avenida de Andalucía, 54",
+"Cervantes, 29",
+"Cervantes, 57",
+"Valeriano Becquer, 5",
+"Benajete, 24",
+"Ramón y Cajal, 68",
+"Ramón y Cajal, 48",
+"Armenta, 43",
+"Marchenilla, 23",
+"Marchenilla, 70",
+"Avenida Blas Infante, 18",
+"Nuestra Señora del Amparo, 63",
+"Nuestra Señora del Amparo, 31",
+"Sevilla, 64",
+"Gandul, 168",
+"Gandul, 114",
+"Gandul, 46",
+"Catalina González, 7",
+"Ancha, 8",
+"Ancha, 69",
+"Calatrava, 35",
+"Camino de Alconchel, 60",
+"Olivo, 28",
+"Ancha, 127",
+"Real, 40",
+"Daoiz, 27",
+"Arrabal, 16",
+"José María del Rey, 22",
+"San Fernando, 60",
+"San Fernando, 16",
+"Plaza Antonio Mairena"
+];
+
+const distancias = [
+270,350,160,98,200,110,200,190,180,120,170,130,130,160,
+280,140,170,230,160,220,170,170,270,220,210,250,160,270,
+180,200,270,180,160,110
+];
+
+let acumulado = 0;
+const map = L.map("map").setView([37.3869, -5.7473], 15);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+const bounds = [];
+let total = distancias.reduce((a,b)=>a+b,0);
+document.getElementById("total").textContent = total + " m";
+
+paradas.forEach(async (dir, i) => {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(dir + ", Mairena del Alcor")}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.length) return;
+
+    const latlng = [data[0].lat, data[0].lon];
+    bounds.push(latlng);
+
+    const icon = L.divIcon({
+        html:`<div class="numero">${i+1}</div>`,
+        iconSize:[28,28],
+        iconAnchor:[14,14]
+    });
+
+    let texto = `<strong>Parada ${i+1}</strong><br>${dir}`;
+    if (i > 0) {
+        acumulado += distancias[i-1];
+        texto += `<br>Desde anterior: ${distancias[i-1]} m`;
+        texto += `<br>Acumulado: ${acumulado} m`;
+    }
+
+    L.marker(latlng, {icon}).addTo(map).bindPopup(texto);
+});
+
+setTimeout(()=> map.fitBounds(bounds, {padding:[40,40]}), 3000);
+
+function exportarPDF() {
+    map.invalidateSize();
+    html2canvas(document.getElementById("map")).then(canvas => {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF("landscape", "mm", "a4");
+        const img = canvas.toDataURL("image/png");
+        pdf.addImage(img, "PNG", 0, 0, 297, 210);
+        pdf.save("recorrido-mairena.pdf");
+    });
+}
+</script>
+
+</body>
+</html>
